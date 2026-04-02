@@ -9,8 +9,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -18,7 +20,7 @@ import (
 // timeoutLimit = 100 - ошибок не будет;
 // timeoutLimit = 0 - всегда будет возвращаться ошибка.
 // Можете "поиграть" с этим параметром, для проверки случаев с возвращением ошибки.
-const timeoutLimit = 90
+const timeoutLimit = 70
 
 type Result struct {
 	msg string
@@ -41,9 +43,33 @@ func fakeDownload(url string) Result {
 
 // download - параллельно скачивает данные из urls
 func download(urls []string) ([]string, error) {
-	// напишите ваш код здесь
-	return nil, nil
-
+	resultChan := make(chan Result, len(urls))
+	var wg sync.WaitGroup
+	go func() {
+		defer close(resultChan)
+		for _, url := range urls {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				resultChan <- fakeDownload(url)
+			}()
+		}
+		wg.Wait()
+	}()
+	msgs := make([]string, len(urls))
+	var err error
+	for result := range resultChan {
+		if result.err != nil {
+			err = errors.Join(err, result.err)
+		} else {
+			msgs = append(msgs, result.msg)
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	wg.Wait()
+	return msgs, nil
 }
 
 func main() {
