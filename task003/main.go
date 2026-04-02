@@ -14,21 +14,42 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
-	pipeline := squarer(ctx, generator(ctx, 1, 2, 3))
+	ctx, cancel := context.WithCancel(context.Background())
+	pipeline := squarer(ctx, generator(ctx, 1, 3, 2, 5))
 	for x := range pipeline {
+		if x == 4 {
+			cancel()
+		}
 		fmt.Println(x)
 	}
 }
 
 func generator(ctx context.Context, in ...int) <-chan int {
-	// напишите ваш код здесь
-
-	return nil
-
+	out := make(chan int, len(in))
+	go func() {
+		defer close(out)
+		for _, val := range in {
+			select {
+			case <-ctx.Done():
+				return
+			case out <- val:
+			}
+		}
+	}()
+	return out
 }
 
 func squarer(ctx context.Context, in <-chan int) <-chan int {
-	// напишите ваш код здесь
-	return nil
+	result := make(chan int)
+	go func() {
+		defer close(result)
+		for v := range in {
+			select {
+			case <-ctx.Done():
+				return
+			case result <- v * v:
+			}
+		}
+	}()
+	return result
 }
