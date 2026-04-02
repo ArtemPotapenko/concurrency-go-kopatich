@@ -17,16 +17,39 @@ package main
 
 import (
 	"fmt"
+	"sync"
 )
 
 // merge - соединяет каналы в один
 func merge(cs ...<-chan int) <-chan int {
-	return nil
+	mergeChan := make(chan int)
+	var wg sync.WaitGroup
+	go func() {
+		defer close(mergeChan)
+		for _, in := range cs {
+			wg.Add(1)
+			go func(c <-chan int) {
+				defer wg.Done()
+				for v := range c {
+					mergeChan <- v
+				}
+			}(in)
+		}
+		wg.Wait()
+	}()
+	return mergeChan
 }
 
 // fillChan - заполняет канал числами от 0 до n-1
 func fillChan(n int) <-chan int {
-	return nil
+	c := make(chan int)
+	go func() {
+		defer close(c)
+		for i := range n {
+			c <- i
+		}
+	}()
+	return c
 }
 
 func main() {
