@@ -14,12 +14,18 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 )
 
 func worker(f func(int) int, jobs <-chan int, results chan<- int, wg *sync.WaitGroup) {
-	// напишите ваш код здесь
-	return
+	go func() {
+		for n := range jobs {
+			v := f(n)
+			results <- v
+		}
+		wg.Done()
+	}()
 }
 
 const numJobs = 5
@@ -29,10 +35,28 @@ func main() {
 	jobs := make(chan int, numJobs)
 	results := make(chan int, numJobs)
 	wg := sync.WaitGroup{}
-
 	multiplier := func(x int) int {
 		return x * 10
 	}
 
-	// напишите ваш код здесь
+	go func() {
+		defer close(jobs)
+		for i := 1; i <= numJobs; i++ {
+			jobs <- i
+		}
+	}()
+	wg.Add(numWorkers)
+
+	for range numWorkers {
+		worker(multiplier, jobs, results, &wg)
+	}
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	for v := range results {
+		fmt.Println(v)
+	}
+
 }
