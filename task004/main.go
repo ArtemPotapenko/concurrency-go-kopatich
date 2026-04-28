@@ -9,29 +9,54 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 )
 
 func repeatFn(ctx context.Context, fn func() interface{}) <-chan interface{} {
-	// напишите ваш код здесь
-	return nil
+	ch := make(chan interface{})
+	go func() {
+		defer close(ch)
+		for {
+			v := fn()
+			select {
+			case <-ctx.Done():
+				return
+			case ch <- v:
+			}
+		}
+	}()
+	return ch
 }
 
 func take(ctx context.Context, in <-chan interface{}, num int) <-chan interface{} {
-	// напишите ваш код здесь
-	return nil
+	out := make(chan interface{}, num)
+	go func() {
+		defer close(out)
+		for range num {
+			select {
+			case v := <-in:
+				out <- v
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return out
 }
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	rand := func() interface{} { return rand.Int() }
+	randi := func() interface{} { return rand.Intn(10) }
 
 	var res []interface{}
-	for num := range take(ctx, repeatFn(ctx, rand), 3) {
+	for num := range take(ctx, repeatFn(ctx, randi), 3) {
 		res = append(res, num)
 	}
+
+	fmt.Println(res)
 
 	if len(res) != 3 {
 		panic("wrong code")
